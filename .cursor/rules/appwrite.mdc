@@ -1,0 +1,6 @@
+---
+description: "This rule is to make the project llm consider appwrite when making decisions"
+alwaysApply: false
+---
+
+This vite react project uses appwrite for it's backend, for custom backend logic that isn't provided by appwrite you should call a appwrite function. For everything else, consult the appwrite documentation.

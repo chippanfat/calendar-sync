@@ -1,0 +1,6 @@
+---
+alwaysApply: true
+description: "use bun runtime instead of nodejs"
+---
+
+Use the "bun" runtime instead of "nodejs" or "npm" when executing commands
