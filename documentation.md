@@ -18,14 +18,34 @@ Create a `.env` file in the `calendar-frontend` directory with the following var
 ```env
 VITE_APPWRITE_ENDPOINT=http://localhost/v1
 VITE_APPWRITE_PROJECT_ID=your_project_id_here
+
+VITE_GOOGLE_CLIENT_ID=your_google_client_id_here.apps.googleusercontent.com
+VITE_GOOGLE_REDIRECT_URI=http://localhost:5173/calendar
 ```
 
-**Getting your Project ID:**
+**Getting your Appwrite Project ID:**
 1. Start Appwrite with `docker-compose up -d` from the root directory
 2. Access Appwrite Console at `http://localhost/console`
 3. Create a new project or use an existing one
 4. Copy the Project ID from the project settings
 5. Make sure Email/Password and Magic URL authentication methods are enabled in Auth settings
+
+**Setting up Google OAuth 2.0:**
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Enable the Google Calendar API:
+   - Go to "APIs & Services" > "Library"
+   - Search for "Google Calendar API"
+   - Click "Enable"
+4. Create OAuth 2.0 credentials:
+   - Go to "APIs & Services" > "Credentials"
+   - Click "Create Credentials" > "OAuth client ID"
+   - Select "Web application"
+   - Add authorized JavaScript origins: `http://localhost:5173`
+   - Add authorized redirect URIs: `http://localhost:5173/calendar`
+   - Click "Create"
+5. Copy the Client ID and paste it into your `.env` file as `VITE_GOOGLE_CLIENT_ID`
+6. Note: For production, use your production domain instead of localhost
 
 ### Installation
 
@@ -47,7 +67,7 @@ bun run dev
 
 ## Authentication
 
-The app uses Appwrite for authentication with two methods enabled:
+The app uses Appwrite for authentication with multiple methods:
 
 ### 1. Email/Password Authentication
 - Traditional username/password login
@@ -62,6 +82,58 @@ The app uses Appwrite for authentication with two methods enabled:
 - Click the link to automatically sign in
 - No password required
 - Links expire in 1 hour
+
+## Calendar Providers
+
+The app supports connecting to cloud calendar providers to sync events. This is separate from app authentication.
+
+### Connecting Cloud Calendars
+
+Users can connect their cloud calendars to view and manage events:
+
+- **Google Calendar** - OAuth 2.0 integration to sync Google Calendar events
+  - Uses OAuth 2.0 implicit grant flow
+  - Requests calendar read and event management permissions
+  - Access tokens stored locally (should be moved to backend in production)
+  - Token validation and refresh to be implemented
+- **Microsoft Outlook** - OAuth integration coming soon
+- Additional providers coming soon (Apple Calendar)
+- Access via "Add Calendar" button on the Calendar page
+- Secure OAuth flow with CSRF protection using state parameter
+
+### Add Calendar Flow
+
+1. User must be logged into the app first
+2. Navigate to Calendar page (`/calendar`)
+3. Click "Add Calendar" button (opens a side panel)
+4. Choose a calendar provider from the sheet (Google, Microsoft, etc.)
+5. User is redirected to the provider's OAuth consent screen
+6. User grants permissions to access their calendar
+7. Provider redirects back to the Calendar page with access token
+8. App stores the token and displays success message
+9. Calendar events can now be fetched using the access token
+
+The "Add Calendar" interface uses a shadcn Sheet component that slides in from the right side of the screen, providing a seamless UX without leaving the calendar page.
+
+**OAuth Flow Details (Google Calendar):**
+- Uses OAuth 2.0 implicit grant flow
+- Factory pattern for provider-specific OAuth handlers
+- Provider enum (`CalendarProvider.GOOGLE`, `CalendarProvider.MICROSOFT`) for type safety
+- Generates cryptographically random state parameter for CSRF protection
+- Requests scopes: `calendar.readonly` and `calendar.events`
+- Access token returned in URL hash fragment
+- Token validated against stored state parameter
+- Scopes verified to ensure user granted required permissions
+
+**Code Architecture:**
+- `CalendarProvider` enum defines supported providers
+- `createCalendarProviderHandler()` factory returns provider-specific config
+- Each provider handler includes:
+  - `isConfigured()` - Checks if env variables are set
+  - `getConfigError()` - Returns user-friendly error message
+  - `initiateOAuth()` - Starts the OAuth flow
+- View components use the factory, keeping OAuth logic separate
+
 
 ### Auth Pages
 
@@ -144,7 +216,7 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 ### Available Routes
 
 - `/` - Home page (shows different content for logged-in vs logged-out users)
-- `/calendar` - Calendar view (protected, requires authentication)
+- `/calendar` - Calendar view with "Add Calendar" sheet (protected, requires authentication)
 - `/about` - About page with app information
 - `/auth/login` - Login page
 - `/auth/register` - Registration page
@@ -197,13 +269,15 @@ console.log(location.pathname)
 calendar-frontend/
 ├── src/
 │   ├── components/
-│   │   ├── ui/              # shadcn/ui components
+│   │   ├── ui/              # shadcn/ui components (button, input, label, sheet)
 │   │   ├── Navigation.tsx   # Main navigation bar
-│   │   └── ProtectedRoute.tsx # Route protection wrapper
+│   │   ├── ProtectedRoute.tsx # Route protection wrapper
+│   │   └── OAuthProviders.tsx # Calendar provider buttons (Google Calendar, etc.)
 │   ├── contexts/
 │   │   └── AuthContext.tsx  # Authentication state management
 │   ├── lib/
 │   │   ├── appwrite.ts      # Appwrite client configuration
+│   │   ├── oauth.ts         # OAuth 2.0 utilities (enums, factory, handlers)
 │   │   └── utils.ts         # Utility functions
 │   ├── pages/
 │   │   ├── auth/
@@ -212,7 +286,7 @@ calendar-frontend/
 │   │   │   ├── MagicURL.tsx # Magic link authentication
 │   │   │   └── Logout.tsx   # Logout with session cleanup
 │   │   ├── Home.tsx         # Landing page
-│   │   ├── Calendar.tsx     # Calendar view (protected)
+│   │   ├── Calendar.tsx     # Calendar view with sheet for adding calendars (protected)
 │   │   ├── About.tsx        # About page
 │   │   └── NotFound.tsx     # 404 page
 │   ├── App.tsx              # Route configuration
@@ -266,8 +340,78 @@ Access the Appwrite Console at `http://localhost/console`
 
 ### "Project ID not found"
 - Ensure `.env` file exists in `calendar-frontend/`
+- Copy `.env.example` to `.env` and fill in your values
 - Verify `VITE_APPWRITE_PROJECT_ID` is set correctly
 - Restart dev server after changing `.env`
+
+### "Google Client ID not configured"
+- Ensure `VITE_GOOGLE_CLIENT_ID` is set in your `.env` file
+- Follow the Google OAuth setup instructions above
+- The client ID should end with `.apps.googleusercontent.com`
+- Restart dev server after adding the client ID
+
+### OAuth "redirect_uri_mismatch" error
+- Ensure the redirect URI in Google Cloud Console matches exactly
+- Should be: `http://localhost:5173/calendar` (for development)
+- Check that authorized JavaScript origins includes: `http://localhost:5173`
+- For production, use your production domain
+
+### "State mismatch" error
+- This indicates a potential CSRF attack
+- Clear browser localStorage and try again
+- Make sure you're not opening multiple OAuth flows simultaneously
+
+## Testing Google Calendar Integration
+
+### Prerequisites
+1. Complete the Google OAuth setup (see Environment Configuration above)
+2. Have a Google account with at least one calendar
+
+### Steps to Test
+1. Start the development server: `bun run dev`
+2. Log into the app with your credentials
+3. Navigate to the Calendar page (`/calendar`)
+4. Click "Add Calendar" button
+5. Click "Google Calendar" from the provider list
+6. You'll be redirected to Google's consent screen
+7. Sign in with your Google account (if not already signed in)
+8. Review the permissions requested:
+   - "See, edit, share, and permanently delete all the calendars you can access using Google Calendar"
+   - "View and edit events on all your calendars"
+9. Click "Allow" to grant permissions
+10. You'll be redirected back to the Calendar page
+11. A success message should appear: "Successfully connected to Google Calendar!"
+12. Open browser console (F12) to see OAuth details logged
+
+### What Happens Behind the Scenes
+1. **State Generation**: A random CSRF token is generated and stored
+2. **URL Construction**: OAuth URL is built with query parameters (client ID, scopes, state, etc.)
+3. **Redirect**: Browser navigates to Google's OAuth endpoint
+4. **Google Authorization**: User grants/denies permissions on Google's consent screen
+5. **Callback**: Google redirects back with access token in URL hash fragment
+6. **Validation**: App validates state parameter matches (CSRF protection)
+7. **Token Storage**: Access token is stored in localStorage (temporary)
+8. **Scope Check**: App verifies which permissions were granted
+
+### Viewing the Access Token
+Open browser console and run:
+```javascript
+localStorage.getItem('google-access-token')
+```
+
+### Token Information
+- **Expiry**: Check `google-token-expiry` in localStorage
+- **Scopes**: Check `google-scopes` in localStorage
+- **Lifetime**: Typically 1 hour (3600 seconds)
+
+### Next Steps for Production
+⚠️ **Important**: Current implementation stores tokens in localStorage for demonstration. In production:
+1. Send access token to your backend immediately
+2. Store tokens encrypted in your database
+3. Never expose tokens in client-side code
+4. Implement token refresh mechanism
+5. Use backend to make Calendar API calls
+6. Add proper error handling and retry logic
 
 ### "Failed to connect to Appwrite"
 - Check Appwrite is running: `docker-compose ps`
@@ -292,14 +436,39 @@ Access the Appwrite Console at `http://localhost/console`
 
 ### Authentication Enhancements
 - Implement password reset functionality
-- Add OAuth providers (Google, GitHub, etc.)
 - Set up user profile management
 - Configure email templates
 - Add role-based access control
+
+### Calendar Provider Integration
+- **Google Calendar OAuth** ✅ Implemented (Frontend)
+  - OAuth 2.0 implicit grant flow
+  - CSRF protection with state parameter
+  - Scope validation
+  - Access token storage in localStorage
+- **Backend Integration** - Next Steps
+  - Move token storage from localStorage to secure backend
+  - Implement token refresh mechanism
+  - Validate tokens server-side
+  - Encrypt stored tokens
+  - Handle token expiration gracefully
+- **Fetch and Display Events**
+  - Use Google Calendar API to fetch events
+  - Parse and normalize event data
+  - Display events in calendar UI
+  - Handle timezone conversions
+- **Additional Providers**
+  - Implement Microsoft OAuth (Outlook/Office 365)
+  - Add Apple Calendar support
+  - Support multiple connected calendars per user
+- **Event Operations**
+  - Support for read/write operations on connected calendars
+  - Create, update, delete events
+  - Sync bidirectionally
 
 ### Calendar Features
 - Calendar event creation and management
 - Date picker and calendar UI
 - Event reminders and notifications
 - Calendar sharing and collaboration
-- Integration with external calendar services
+- Multi-calendar view with provider filtering

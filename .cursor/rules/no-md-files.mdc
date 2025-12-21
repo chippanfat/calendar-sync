@@ -3,4 +3,4 @@ alwaysApply: true
 description: "Cursor loves creating an MD file for each chat or piece of work completed. I don't love it"
 ---
 
-When a specific task is completed, do not generate a specific MD file for these changes. Instead, add the documentation to a file called 'documentation.md' and use that as a central source of knowledge instead of multiple files. Ensure the content of the documeentation.md file is easy enough to read that a junior developer can understand what outcome the project is trying to achive and that the user can setup the project and have most of their questions answered by reading the documentation.md file
+When a specific task is completed, do not generate a specific MD file for the changes. Instead, add the documentation to a file called 'documentation.md' this file is located in the project root. Use that file as a central source of knowledge instead of multiple files. Ensure the content of the documeentation.md file is easy enough to read that a junior developer can understand what outcome the project is trying to achive and that the user can setup the project and have most of their questions answered by reading the documentation.md file
