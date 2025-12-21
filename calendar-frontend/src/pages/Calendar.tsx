@@ -16,6 +16,7 @@ import {
   hasScope, 
   GOOGLE_CALENDAR_SCOPES 
 } from '@/lib/oauth'
+import { storeCalendarToken } from '@/lib/functions'
 
 export default function Calendar() {
   const [count, setCount] = useState(0)
@@ -60,21 +61,24 @@ export default function Calendar() {
           })
         }
 
-        // Store the access token (in a real app, send this to your backend)
-        // For now, just store it in localStorage for demonstration
-        localStorage.setItem(`${provider}-access-token`, access_token)
-        localStorage.setItem(`${provider}-token-expiry`, String(Date.now() + (parseInt(expires_in) * 1000)))
-        localStorage.setItem(`${provider}-scopes`, scope)
+        // Store the access token securely via Appwrite Function
+        try {
+          const result = await storeCalendarToken({
+            provider: provider || CalendarProvider.GOOGLE,
+            accessToken: access_token,
+            scope: scope,
+            expiresIn: expires_in,
+          })
 
-        setOauthMessage(`Successfully connected to ${providerName}!`)
+          console.log('Calendar token stored successfully:', result)
+          setOauthMessage(`Successfully connected to ${providerName}!`)
+        } catch (storeError) {
+          console.error('Failed to store calendar token:', storeError)
+          setOauthMessage(`Connected to ${providerName}, but failed to save. Please try again.`)
+        }
 
         // Clear the hash from the URL
         window.history.replaceState(null, '', window.location.pathname)
-
-        // TODO: In production, send the access token to your backend to:
-        // 1. Validate the token
-        // 2. Store it securely (encrypted)
-        // 3. Fetch and sync calendar events
       }
     }
   }, [])

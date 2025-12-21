@@ -278,6 +278,7 @@ calendar-frontend/
 │   ├── lib/
 │   │   ├── appwrite.ts      # Appwrite client configuration
 │   │   ├── oauth.ts         # OAuth 2.0 utilities (enums, factory, handlers)
+│   │   ├── functions.ts     # Appwrite Functions client utilities
 │   │   └── utils.ts         # Utility functions
 │   ├── pages/
 │   │   ├── auth/
@@ -325,6 +326,41 @@ The app connects to an Appwrite instance running locally via Docker. The Appwrit
 - Redis for caching
 - Full authentication system
 - Email services for magic URLs
+- Functions for server-side operations
+
+### Appwrite Functions
+
+The project includes serverless functions for secure operations:
+
+**`google-oauth-login` Function:**
+- Securely stores OAuth tokens for calendar providers
+- Automatically authenticates users via session cookies
+- Validates user permissions before storing data
+- Function ID: `69487dbd00224e38d484`
+- Runtime: Node.js 16
+- Permissions: Requires authenticated user (`x-appwrite-user-id` header)
+
+**How Authentication Works in Functions:**
+
+When a logged-in user calls a function, Appwrite automatically includes:
+- `x-appwrite-user-id` - Current user's ID
+- `x-appwrite-user-jwt` - User's JWT token
+- `x-appwrite-session-id` - Active session ID
+
+The function validates these headers to ensure the user is authenticated before processing requests.
+
+**Deploying Functions:**
+```bash
+# Deploy the function
+appwrite deploy function
+
+# Or deploy with CLI
+cd functions/google-oauth-login
+appwrite functions createDeployment \
+  --functionId=69487dbd00224e38d484 \
+  --entrypoint=src/main.js \
+  --code=.
+```
 
 ### Starting Appwrite
 
@@ -405,13 +441,74 @@ localStorage.getItem('google-access-token')
 - **Lifetime**: Typically 1 hour (3600 seconds)
 
 ### Next Steps for Production
-⚠️ **Important**: Current implementation stores tokens in localStorage for demonstration. In production:
-1. Send access token to your backend immediately
-2. Store tokens encrypted in your database
-3. Never expose tokens in client-side code
-4. Implement token refresh mechanism
-5. Use backend to make Calendar API calls
-6. Add proper error handling and retry logic
+⚠️ **Important**: OAuth tokens are now stored via Appwrite Function. Additional security steps:
+1. ✅ Tokens sent to backend function (implemented)
+2. 🔒 Encrypt tokens before storing in database (TODO - use crypto library)
+3. 🔄 Implement token refresh mechanism
+4. ✅ User authentication verified via session cookies (implemented)
+5. 📊 Fetch calendar events via backend function (TODO)
+6. 🛡️ Add rate limiting and error handling
+
+## Appwrite Functions & Authentication
+
+### How Session Authentication Works
+
+**Client Side (Frontend):**
+1. User logs in via `account.createEmailPasswordSession()`
+2. Appwrite creates a JWT token stored in HTTP-only cookie
+3. Cookie is automatically sent with all requests (including function calls)
+
+**Server Side (Functions):**
+1. Function receives request with authentication headers
+2. Headers include: `x-appwrite-user-id`, `x-appwrite-user-jwt`, `x-appwrite-session-id`
+3. Function validates user is authenticated
+4. Function performs authorized operations
+
+### Function Authentication Example
+
+```javascript
+export default async ({ req, res, log, error }) => {
+  // 1. Extract user ID from headers (automatically added by Appwrite)
+  const userId = req.headers['x-appwrite-user-id']
+  
+  // 2. Check authentication
+  if (!userId) {
+    return res.json({
+      success: false,
+      message: 'Unauthorized - Please log in'
+    }, 401)
+  }
+  
+  // 3. User is authenticated - safe to proceed
+  log(`Processing request for user: ${userId}`)
+  
+  // 4. Perform user-specific operations
+  // The userId ensures data is isolated per user
+}
+```
+
+### Calling Functions from Frontend
+
+```typescript
+import { functions } from './lib/functions'
+
+// Automatically includes session cookie
+const result = await storeCalendarToken({
+  provider: 'google',
+  accessToken: token,
+  scope: 'calendar.readonly',
+  expiresIn: '3600'
+})
+```
+
+### Security Benefits
+
+✅ **Automatic Authentication** - No need to manually pass tokens
+✅ **HTTP-Only Cookies** - Protected from XSS attacks
+✅ **CSRF Protection** - Built-in security measures
+✅ **JWT Validation** - Appwrite validates all tokens
+✅ **User Isolation** - Each user can only access their own data
+✅ **Session Management** - Automatic expiration and refresh
 
 ### "Failed to connect to Appwrite"
 - Check Appwrite is running: `docker-compose ps`

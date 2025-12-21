@@ -26,6 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function checkUser() {
     try {
       const currentUser = await account.get()
+      console.log(currentUser)
       setUser(currentUser)
     } catch (error) {
       setUser(null)

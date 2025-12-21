@@ -1,0 +1,16 @@
+{
+  "name": "google-oauth-login",
+  "version": "1.0.0",
+  "description": "Securely store Google Calendar OAuth tokens for authenticated users",
+  "main": "src/main.js",
+  "type": "module",
+  "scripts": {
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "node-appwrite": "^20.2.1"
+  },
+  "devDependencies": {
+    "prettier": "^3.2.5"
+  }
+}

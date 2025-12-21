@@ -1,0 +1,82 @@
+{
+    "projectId": "6939e6b00019b0912e19",
+    "projectName": "Calendar",
+    "settings": {
+        "services": {
+            "account": true,
+            "avatars": true,
+            "databases": true,
+            "locale": true,
+            "health": true,
+            "storage": true,
+            "teams": true,
+            "users": true,
+            "sites": true,
+            "functions": true,
+            "graphql": true,
+            "messaging": true
+        },
+        "auth": {
+            "methods": {
+                "jwt": false,
+                "phone": false,
+                "invites": false,
+                "anonymous": false,
+                "email-otp": false,
+                "magic-url": true,
+                "email-password": true
+            },
+            "security": {
+                "duration": 31536000,
+                "limit": 0,
+                "sessionsLimit": 10,
+                "passwordHistory": 0,
+                "passwordDictionary": false,
+                "personalDataCheck": false,
+                "sessionAlerts": false,
+                "mockNumbers": []
+            }
+        }
+    },
+    "tablesDB": [
+        {
+            "$id": "6939e81e00122e88459e",
+            "name": "calendar-db",
+            "enabled": true
+        }
+    ],
+    "tables": [
+        {
+            "$id": "user_calendars",
+            "$permissions": [],
+            "databaseId": "6939e81e00122e88459e",
+            "name": "user_calendars",
+            "enabled": true,
+            "rowSecurity": false,
+            "columns": [],
+            "indexes": []
+        }
+    ],
+    "functions": [
+        {
+            "$id": "69487dbd00224e38d484",
+            "name": "google-oauth-login",
+            "runtime": "node-16.0",
+            "specification": "s-0.5vcpu-512mb",
+            "execute": [
+                "users"
+            ],
+            "events": [],
+            "scopes": [
+                "users.read"
+            ],
+            "schedule": "",
+            "timeout": 15,
+            "enabled": true,
+            "logging": true,
+            "entrypoint": "src/main.js",
+            "commands": "npm install",
+            "path": "functions/google-oauth-login"
+        }
+    ]
+}
