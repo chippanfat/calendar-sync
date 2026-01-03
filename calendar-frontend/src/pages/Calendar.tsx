@@ -62,23 +62,19 @@ export default function Calendar() {
         }
 
         // Store the access token securely via Appwrite Function
-        try {
-          const result = await storeCalendarToken({
+          storeCalendarToken({
             provider: provider || CalendarProvider.GOOGLE,
             accessToken: access_token,
             scope: scope,
             expiresIn: expires_in,
+          }).then(() => {
+            setOauthMessage(`Successfully connected to ${providerName}!`)
+            // Clear the hash from the URL
+            window.history.replaceState(null, '', window.location.pathname)
+          }).catch((error) => {
+            console.error('Failed to store calendar token:', error)
+            setOauthMessage(`Failed to connect to ${providerName}: ${error.message}`)
           })
-
-          console.log('Calendar token stored successfully:', result)
-          setOauthMessage(`Successfully connected to ${providerName}!`)
-        } catch (storeError) {
-          console.error('Failed to store calendar token:', storeError)
-          setOauthMessage(`Connected to ${providerName}, but failed to save. Please try again.`)
-        }
-
-        // Clear the hash from the URL
-        window.history.replaceState(null, '', window.location.pathname)
       }
     }
   }, [])

@@ -21,7 +21,7 @@ export async function storeCalendarToken(data: {
     // The Appwrite SDK automatically includes the session cookie
     // which adds x-appwrite-user-id and other auth headers
     const response = await functions.createExecution({
-      functionId: '69487dbd00224e38d484',
+      functionId: '694db192003ae6592d13',
       body: JSON.stringify(data),
     })
 
@@ -37,11 +37,10 @@ export async function storeCalendarToken(data: {
  */
 export async function getUserCalendars() {
   try {
-    const response = await functions.createExecution(
-      '69487dbd00224e38d484',
-      JSON.stringify({ action: 'list' }),
-      false
-    )
+    const response = await functions.createExecution({
+      functionId: '694db192003ae6592d13',
+      body: JSON.stringify({ action: 'list' }),
+    })
 
     if (response.responseStatusCode !== 200) {
       throw new Error(`Function error: ${response.responseBody}`)

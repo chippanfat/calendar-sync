@@ -1,0 +1,3 @@
+{
+    "phpcs.executablePath": "./functions/oauth-login/vendor/bin/phpcs"
+}

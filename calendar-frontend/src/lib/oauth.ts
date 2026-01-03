@@ -36,6 +36,13 @@ interface GoogleOAuthParams {
   scopes: string[]
 }
 
+interface MicrosoftOAuthParams {
+  clientId: string
+  redirectUri: string
+  scopes: string[]
+  tenant?: string // Optional: 'common', 'organizations', 'consumers', or specific tenant ID
+}
+
 /**
  * Initiates the Google OAuth 2.0 flow by redirecting to Google's authorization server
  */
@@ -63,6 +70,36 @@ export function initiateGoogleOAuth(params: GoogleOAuthParams): void {
 }
 
 /**
+ * Initiates the Microsoft OAuth 2.0 flow by redirecting to Microsoft's authorization server
+ * Supports Azure AD, Microsoft Accounts, and Office 365
+ */
+export function initiateMicrosoftOAuth(params: MicrosoftOAuthParams): void {
+  // Generate and store random state value for CSRF protection
+  const state = generateCryptoRandomState()
+  localStorage.setItem('oauth2-state', state)
+  localStorage.setItem('oauth2-provider', 'microsoft')
+
+  // Microsoft Identity Platform endpoint
+  // Use 'common' to support both personal Microsoft accounts and work/school accounts
+  const tenant = params.tenant || 'common'
+  const oauth2Endpoint = `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/authorize`
+
+  // Build URL with query parameters
+  const urlParams = new URLSearchParams({
+    client_id: params.clientId,
+    redirect_uri: params.redirectUri,
+    response_type: 'token', // Implicit grant flow (returns access_token directly)
+    scope: params.scopes.join(' '),
+    state: state,
+    response_mode: 'fragment', // Return tokens in URL fragment (hash)
+    nonce: generateCryptoRandomState(), // Additional security for token validation
+  })
+
+  // Redirect to Microsoft's OAuth server
+  window.location.href = `${oauth2Endpoint}?${urlParams.toString()}`
+}
+
+/**
  * Google Calendar OAuth scopes
  */
 export const GOOGLE_CALENDAR_SCOPES = {
@@ -74,6 +111,25 @@ export const GOOGLE_CALENDAR_SCOPES = {
   EVENTS: 'https://www.googleapis.com/auth/calendar.events',
   // Read-only access to calendar events
   EVENTS_READONLY: 'https://www.googleapis.com/auth/calendar.events.readonly',
+}
+
+/**
+ * Microsoft Graph OAuth scopes for Calendar (Outlook/Office 365)
+ * https://learn.microsoft.com/en-us/graph/permissions-reference
+ */
+export const MICROSOFT_CALENDAR_SCOPES = {
+  // Read user's calendars
+  CALENDARS_READ: 'Calendars.Read',
+  // Read and write user's calendars
+  CALENDARS_READWRITE: 'Calendars.ReadWrite',
+  // Read user's and shared calendars
+  CALENDARS_READ_SHARED: 'Calendars.Read.Shared',
+  // Read and write user's and shared calendars
+  CALENDARS_READWRITE_SHARED: 'Calendars.ReadWrite.Shared',
+  // Offline access (refresh tokens)
+  OFFLINE_ACCESS: 'offline_access',
+  // Read user's profile
+  USER_READ: 'User.Read',
 }
 
 /**
@@ -141,7 +197,7 @@ export function createCalendarProviderHandler(provider: CalendarProvider): Provi
         },
         initiateOAuth: () => {
           const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
-          const redirectUri = import.meta.env.VITE_GOOGLE_REDIRECT_URI || window.location.origin + '/calendar'
+          const redirectUri = import.meta.env.VITE_GOOGLE_REDIRECT_URI || window.location.origin + '/oauth/google/callback'
 
           if (!clientId) {
             throw new Error('Google Client ID not configured')
@@ -162,15 +218,31 @@ export function createCalendarProviderHandler(provider: CalendarProvider): Provi
       return {
         name: 'Microsoft Outlook',
         isConfigured: () => {
-          // Microsoft OAuth not yet implemented
-          return false
+          return !!import.meta.env.VITE_MICROSOFT_CLIENT_ID
         },
         getConfigError: () => {
-          return 'Microsoft Outlook integration is coming soon!'
+          return 'Microsoft Outlook integration is not configured. Please set VITE_MICROSOFT_CLIENT_ID in your .env file.'
         },
         initiateOAuth: () => {
-          // TODO: Implement Microsoft OAuth flow
-          throw new Error('Microsoft OAuth not yet implemented')
+          const clientId = import.meta.env.VITE_MICROSOFT_CLIENT_ID
+          const redirectUri = import.meta.env.VITE_MICROSOFT_REDIRECT_URI || window.location.origin + '/oauth/microsoft/callback'
+          const tenant = import.meta.env.VITE_MICROSOFT_TENANT || 'common'
+
+          if (!clientId) {
+            throw new Error('Microsoft Client ID not configured')
+          }
+
+          initiateMicrosoftOAuth({
+            clientId,
+            redirectUri,
+            tenant,
+            scopes: [
+              MICROSOFT_CALENDAR_SCOPES.CALENDARS_READ,        // Read calendars
+              MICROSOFT_CALENDAR_SCOPES.CALENDARS_READWRITE,   // Create/edit/delete events
+              MICROSOFT_CALENDAR_SCOPES.USER_READ,             // Read user profile
+              MICROSOFT_CALENDAR_SCOPES.OFFLINE_ACCESS,        // Refresh tokens
+            ],
+          })
         },
       }
 
